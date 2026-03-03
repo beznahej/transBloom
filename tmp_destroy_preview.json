@@ -1,0 +1,22 @@
+{
+  "mode": "dry_run",
+  "created_at_utc": "2026-03-03T21:43:30.156014+00:00",
+  "summary": {
+    "image_files_would_delete": 0,
+    "directories": 2
+  },
+  "runs": [
+    {
+      "image_dir": "data/train/non_flower",
+      "total_before": 800,
+      "would_delete": 0,
+      "would_keep_after": 800
+    },
+    {
+      "image_dir": "data/val/non_flower",
+      "total_before": 800,
+      "would_delete": 0,
+      "would_keep_after": 800
+    }
+  ]
+}
