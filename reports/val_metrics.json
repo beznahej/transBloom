@@ -1,0 +1,43 @@
+{
+  "device": "mps",
+  "split": "val",
+  "checkpoint": "/Users/jehanzeb/_development/transBloom/checkpoints/best_model.pt",
+  "samples": 1820,
+  "loss": 0.19950089223764755,
+  "accuracy": 0.9335164835164835,
+  "classes": [
+    "flower",
+    "non_flower"
+  ],
+  "confusion_matrix": [
+    [
+      961,
+      59
+    ],
+    [
+      62,
+      738
+    ]
+  ],
+  "per_class": [
+    {
+      "class": "flower",
+      "precision": 0.9393939393939394,
+      "recall": 0.942156862745098,
+      "f1": 0.9407733724914341,
+      "support": 1020
+    },
+    {
+      "class": "non_flower",
+      "precision": 0.9259723964868256,
+      "recall": 0.9225,
+      "f1": 0.9242329367564183,
+      "support": 800
+    }
+  ],
+  "macro_avg": {
+    "precision": 0.9326831679403825,
+    "recall": 0.9323284313725491,
+    "f1": 0.9325031546239262
+  }
+}

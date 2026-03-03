@@ -1,0 +1,14 @@
+{
+  "image": "/Users/jehanzeb/_development/transBloom/data/val/flower/oxford_00017.jpg",
+  "model": "/Users/jehanzeb/_development/transBloom/checkpoints/flowernet.onnx",
+  "pred_index": 0,
+  "pred_label": "flower",
+  "probabilities": [
+    0.9999247789382935,
+    7.526952686021104e-05
+  ],
+  "class_names": [
+    "flower",
+    "non_flower"
+  ]
+}

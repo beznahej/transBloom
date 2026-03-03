@@ -1,0 +1,14 @@
+{
+  "image": "/Users/jehanzeb/_development/transBloom/data/val/non_flower/cifar_test_00022.png",
+  "model": "/Users/jehanzeb/_development/transBloom/checkpoints/flowernet.onnx",
+  "pred_index": 1,
+  "pred_label": "non_flower",
+  "probabilities": [
+    1.7978494724957272e-05,
+    0.9999819993972778
+  ],
+  "class_names": [
+    "flower",
+    "non_flower"
+  ]
+}
