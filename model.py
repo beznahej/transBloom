@@ -5,6 +5,11 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
+# PSEUDOCODE (high level):
+# - Choose one of two backbones: CNN or Transformer.
+# - Run forward pass through chosen backbone.
+# - Save/load checkpoints with small metadata needed to rebuild model.
+
 SUPPORTED_MODEL_TYPES = ("cnn", "transformer")
 DEFAULT_TRANSFORMER_CONFIG: Dict[str, Any] = {
     "patch_size": 4,
@@ -29,6 +34,8 @@ def normalize_model_type(model_type: str) -> str:
 class FlowerNetCnn(nn.Module):
     def __init__(self, num_classes: int = 2):
         super().__init__()
+        # PSEUDOCODE:
+        # conv stack -> pooling -> flatten -> small MLP classifier.
         self.conv1 = nn.Conv2d(3, 16, 3)
         self.conv2 = nn.Conv2d(16, 32, 3)
         self.fc1 = nn.Linear(32 * 6 * 6, 128)
@@ -36,6 +43,15 @@ class FlowerNetCnn(nn.Module):
         self.adaptive_pool = nn.AdaptiveAvgPool2d((6, 6))
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        # PSEUDOCODE:
+        # features = relu(conv1(x))
+        # features = max_pool(features)
+        # features = relu(conv2(features))
+        # features = max_pool(features)
+        # features = adaptive_pool(features, 6x6)
+        # features = flatten(features)
+        # hidden = relu(fc1(features))
+        # logits = fc2(hidden)
         x = F.relu(self.conv1(x))
         x = F.max_pool2d(x, 2)
         x = F.relu(self.conv2(x))
@@ -62,6 +78,12 @@ class FlowerNetTransformer(nn.Module):
         if img_size % patch_size != 0:
             raise ValueError(f"img_size={img_size} must be divisible by patch_size={patch_size}")
 
+        # PSEUDOCODE:
+        # patchify image -> token sequence.
+        # prepend learnable [CLS] token.
+        # add positional embeddings.
+        # run transformer encoder layers.
+        # classify using the [CLS] token representation.
         grid = img_size // patch_size
         num_patches = grid * grid
         ff_dim = int(embed_dim * mlp_ratio)
@@ -85,6 +107,9 @@ class FlowerNetTransformer(nn.Module):
         self._init_weights()
 
     def _init_weights(self) -> None:
+        # PSEUDOCODE:
+        # initialize cls/pos/head with small truncated-normal noise.
+        # initialize head bias to zero.
         nn.init.trunc_normal_(self.class_token, std=0.02)
         nn.init.trunc_normal_(self.pos_embed, std=0.02)
         nn.init.trunc_normal_(self.head.weight, std=0.02)
@@ -92,6 +117,14 @@ class FlowerNetTransformer(nn.Module):
             nn.init.zeros_(self.head.bias)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        # PSEUDOCODE:
+        # x -> patch embeddings [B, C, H, W] -> [B, N, D]
+        # cls = expand(class_token, batch)
+        # tokens = concat(cls, x)
+        # tokens = dropout(tokens + pos_embed)
+        # tokens = transformer_encoder(tokens)
+        # cls_out = layer_norm(tokens[:, 0])
+        # logits = linear_head(cls_out)
         batch_size = x.shape[0]
         x = self.patch_embed(x)
         x = x.flatten(2).transpose(1, 2)
@@ -117,6 +150,9 @@ class FlowerNet(nn.Module):
         dropout: float = float(DEFAULT_TRANSFORMER_CONFIG["dropout"]),
     ):
         super().__init__()
+        # PSEUDOCODE:
+        # if model_type == "cnn": build CNN backbone
+        # else: build Transformer backbone with provided config
         self.model_type = normalize_model_type(model_type)
         self.img_size = img_size
 
@@ -145,6 +181,10 @@ def make_checkpoint_payload(
     transformer_config: Dict[str, Any] | None = None,
     extra: Dict[str, Any] | None = None,
 ) -> Dict[str, Any]:
+    # PSEUDOCODE:
+    # payload = {state_dict, model_type, img_size}
+    # if transformer config exists: include it
+    # merge extra metadata (class map, best val acc, etc.)
     payload: Dict[str, Any] = {
         "state_dict": model.state_dict(),
         "model_type": normalize_model_type(model_type),
@@ -158,6 +198,9 @@ def make_checkpoint_payload(
 
 
 def unpack_checkpoint(checkpoint_obj: Any) -> Tuple[Dict[str, torch.Tensor], Dict[str, Any]]:
+    # PSEUDOCODE:
+    # if checkpoint has {"state_dict": ...}: split weights + metadata
+    # else (legacy): treat whole object as state_dict
     if isinstance(checkpoint_obj, dict) and "state_dict" in checkpoint_obj:
         state_dict = checkpoint_obj["state_dict"]
         metadata = {k: v for k, v in checkpoint_obj.items() if k != "state_dict"}
@@ -168,6 +211,10 @@ def unpack_checkpoint(checkpoint_obj: Any) -> Tuple[Dict[str, torch.Tensor], Dic
 
 
 def load_model_state_compat(model: nn.Module, state_dict: Dict[str, torch.Tensor]) -> None:
+    # PSEUDOCODE:
+    # 1) try direct load.
+    # 2) if key mismatch from "model." prefix differences, remap keys and retry.
+    # 3) if still failing, raise original mismatch error.
     try:
         model.load_state_dict(state_dict)
         return

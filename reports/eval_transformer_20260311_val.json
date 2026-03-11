@@ -1,0 +1,53 @@
+{
+  "device": "mps",
+  "model_type": "transformer",
+  "img_size": 32,
+  "transformer_config": {
+    "patch_size": 4,
+    "embed_dim": 128,
+    "depth": 4,
+    "num_heads": 4,
+    "mlp_ratio": 4.0,
+    "dropout": 0.1
+  },
+  "split": "val",
+  "checkpoint": "/Users/jehanzeb/_development/transBloom/checkpoints/transformer_20260311/best_model.pt",
+  "samples": 1820,
+  "loss": 0.3690128450865274,
+  "accuracy": 0.8412087912087912,
+  "classes": [
+    "flower",
+    "non_flower"
+  ],
+  "confusion_matrix": [
+    [
+      898,
+      122
+    ],
+    [
+      167,
+      633
+    ]
+  ],
+  "per_class": [
+    {
+      "class": "flower",
+      "precision": 0.8431924882629108,
+      "recall": 0.8803921568627451,
+      "f1": 0.861390887290168,
+      "support": 1020
+    },
+    {
+      "class": "non_flower",
+      "precision": 0.83841059602649,
+      "recall": 0.79125,
+      "f1": 0.8141479099678456,
+      "support": 800
+    }
+  ],
+  "macro_avg": {
+    "precision": 0.8408015421447004,
+    "recall": 0.8358210784313725,
+    "f1": 0.8377693986290068
+  }
+}
