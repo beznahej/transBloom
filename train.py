@@ -44,6 +44,12 @@ def main():
     parser.add_argument("--output-dir", type=str, default="checkpoints")
     parser.add_argument("--img-size", type=int, default=32)
     parser.add_argument("--model-type", choices=SUPPORTED_MODEL_TYPES, default="cnn")
+    parser.add_argument("--patch-size", type=int, default=4)
+    parser.add_argument("--embed-dim", type=int, default=128)
+    parser.add_argument("--depth", type=int, default=4)
+    parser.add_argument("--num-heads", type=int, default=4)
+    parser.add_argument("--mlp-ratio", type=float, default=4.0)
+    parser.add_argument("--dropout", type=float, default=0.1)
     args = parser.parse_args()
 
     data_dir = Path(args.data_dir)
@@ -103,7 +109,24 @@ def main():
         device = torch.device("mps")
     else:
         device = torch.device("cpu")
-    model = FlowerNet(model_type=args.model_type, img_size=args.img_size).to(device)
+    transformer_config = {
+        "patch_size": args.patch_size,
+        "embed_dim": args.embed_dim,
+        "depth": args.depth,
+        "num_heads": args.num_heads,
+        "mlp_ratio": args.mlp_ratio,
+        "dropout": args.dropout,
+    }
+    model = FlowerNet(
+        model_type=args.model_type,
+        img_size=args.img_size,
+        patch_size=args.patch_size,
+        embed_dim=args.embed_dim,
+        depth=args.depth,
+        num_heads=args.num_heads,
+        mlp_ratio=args.mlp_ratio,
+        dropout=args.dropout,
+    ).to(device)
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
 
@@ -116,6 +139,13 @@ def main():
     best_val_acc = 0.0
     print(f"Using device: {device}")
     print(f"Model type: {args.model_type} | img_size={args.img_size}")
+    if args.model_type == "transformer":
+        print(
+            "Transformer config: "
+            f"patch_size={args.patch_size} embed_dim={args.embed_dim} "
+            f"depth={args.depth} num_heads={args.num_heads} "
+            f"mlp_ratio={args.mlp_ratio} dropout={args.dropout}"
+        )
     print(f"Train samples: {len(train_ds)} | Val samples: {len(val_ds)}")
     print(f"Classes: {train_ds.classes}")
 
@@ -156,6 +186,7 @@ def main():
                 model=model,
                 model_type=args.model_type,
                 img_size=args.img_size,
+                transformer_config=transformer_config if args.model_type == "transformer" else None,
                 extra={
                     "class_to_idx": train_ds.class_to_idx,
                     "best_val_acc": best_val_acc,
@@ -168,6 +199,7 @@ def main():
         model=model,
         model_type=args.model_type,
         img_size=args.img_size,
+        transformer_config=transformer_config if args.model_type == "transformer" else None,
         extra={
             "class_to_idx": train_ds.class_to_idx,
             "best_val_acc": best_val_acc,

@@ -7,6 +7,7 @@ from pathlib import Path
 import torch
 
 from model import (
+    DEFAULT_TRANSFORMER_CONFIG,
     SUPPORTED_MODEL_TYPES,
     FlowerNet,
     load_model_state_compat,
@@ -23,6 +24,12 @@ def parse_args():
     parser.add_argument("--opset", type=int, default=17)
     parser.add_argument("--img-size", type=int, default=None)
     parser.add_argument("--model-type", choices=["auto", *SUPPORTED_MODEL_TYPES], default="auto")
+    parser.add_argument("--patch-size", type=int, default=None)
+    parser.add_argument("--embed-dim", type=int, default=None)
+    parser.add_argument("--depth", type=int, default=None)
+    parser.add_argument("--num-heads", type=int, default=None)
+    parser.add_argument("--mlp-ratio", type=float, default=None)
+    parser.add_argument("--dropout", type=float, default=None)
     parser.add_argument(
         "--dynamic-batch",
         action="store_true",
@@ -56,7 +63,30 @@ def main():
     else:
         resolved_img_size = int(checkpoint_meta.get("img_size", 32))
 
-    model = FlowerNet(model_type=resolved_model_type, img_size=resolved_img_size)
+    transformer_config = dict(DEFAULT_TRANSFORMER_CONFIG)
+    transformer_config.update(checkpoint_meta.get("transformer_config", {}))
+    cli_transformer_overrides = {
+        "patch_size": args.patch_size,
+        "embed_dim": args.embed_dim,
+        "depth": args.depth,
+        "num_heads": args.num_heads,
+        "mlp_ratio": args.mlp_ratio,
+        "dropout": args.dropout,
+    }
+    for key, value in cli_transformer_overrides.items():
+        if value is not None:
+            transformer_config[key] = value
+
+    model = FlowerNet(
+        model_type=resolved_model_type,
+        img_size=resolved_img_size,
+        patch_size=int(transformer_config["patch_size"]),
+        embed_dim=int(transformer_config["embed_dim"]),
+        depth=int(transformer_config["depth"]),
+        num_heads=int(transformer_config["num_heads"]),
+        mlp_ratio=float(transformer_config["mlp_ratio"]),
+        dropout=float(transformer_config["dropout"]),
+    )
     load_model_state_compat(model, state_dict)
     model.eval()
 
@@ -84,6 +114,16 @@ def main():
 
     print(f"Exported ONNX model: {output_path.resolve()}")
     print(f"Model type: {resolved_model_type}")
+    if resolved_model_type == "transformer":
+        print(
+            "Transformer config: "
+            f"patch_size={int(transformer_config['patch_size'])} "
+            f"embed_dim={int(transformer_config['embed_dim'])} "
+            f"depth={int(transformer_config['depth'])} "
+            f"num_heads={int(transformer_config['num_heads'])} "
+            f"mlp_ratio={float(transformer_config['mlp_ratio'])} "
+            f"dropout={float(transformer_config['dropout'])}"
+        )
 
     class_map_path = Path(args.class_map)
     if class_map_path.exists():

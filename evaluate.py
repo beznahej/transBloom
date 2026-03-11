@@ -9,6 +9,7 @@ from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 
 from model import (
+    DEFAULT_TRANSFORMER_CONFIG,
     SUPPORTED_MODEL_TYPES,
     FlowerNet,
     load_model_state_compat,
@@ -117,6 +118,12 @@ def main():
     parser.add_argument("--device", choices=["auto", "cpu", "mps", "cuda"], default="auto")
     parser.add_argument("--model-type", choices=["auto", *SUPPORTED_MODEL_TYPES], default="auto")
     parser.add_argument("--img-size", type=int, default=None)
+    parser.add_argument("--patch-size", type=int, default=None)
+    parser.add_argument("--embed-dim", type=int, default=None)
+    parser.add_argument("--depth", type=int, default=None)
+    parser.add_argument("--num-heads", type=int, default=None)
+    parser.add_argument("--mlp-ratio", type=float, default=None)
+    parser.add_argument("--dropout", type=float, default=None)
     parser.add_argument("--report-json", type=str, default="")
     args = parser.parse_args()
 
@@ -141,6 +148,20 @@ def main():
     else:
         resolved_img_size = int(checkpoint_meta.get("img_size", 32))
 
+    transformer_config = dict(DEFAULT_TRANSFORMER_CONFIG)
+    transformer_config.update(checkpoint_meta.get("transformer_config", {}))
+    cli_transformer_overrides = {
+        "patch_size": args.patch_size,
+        "embed_dim": args.embed_dim,
+        "depth": args.depth,
+        "num_heads": args.num_heads,
+        "mlp_ratio": args.mlp_ratio,
+        "dropout": args.dropout,
+    }
+    for key, value in cli_transformer_overrides.items():
+        if value is not None:
+            transformer_config[key] = value
+
     eval_tfms = transforms.Compose(
         [
             transforms.Resize((resolved_img_size, resolved_img_size)),
@@ -162,7 +183,16 @@ def main():
     )
 
     device = pick_device(args.device)
-    model = FlowerNet(model_type=resolved_model_type, img_size=resolved_img_size).to(device)
+    model = FlowerNet(
+        model_type=resolved_model_type,
+        img_size=resolved_img_size,
+        patch_size=int(transformer_config["patch_size"]),
+        embed_dim=int(transformer_config["embed_dim"]),
+        depth=int(transformer_config["depth"]),
+        num_heads=int(transformer_config["num_heads"]),
+        mlp_ratio=float(transformer_config["mlp_ratio"]),
+        dropout=float(transformer_config["dropout"]),
+    ).to(device)
     load_model_state_compat(model, state_dict)
 
     criterion = nn.CrossEntropyLoss()
@@ -182,6 +212,16 @@ def main():
     print(f"Using device: {device}")
     print(f"Model type: {resolved_model_type}")
     print(f"Image size: {resolved_img_size}")
+    if resolved_model_type == "transformer":
+        print(
+            "Transformer config: "
+            f"patch_size={int(transformer_config['patch_size'])} "
+            f"embed_dim={int(transformer_config['embed_dim'])} "
+            f"depth={int(transformer_config['depth'])} "
+            f"num_heads={int(transformer_config['num_heads'])} "
+            f"mlp_ratio={float(transformer_config['mlp_ratio'])} "
+            f"dropout={float(transformer_config['dropout'])}"
+        )
     print(f"Split: {args.split}")
     print(f"Checkpoint: {checkpoint_path.resolve()}")
     print(f"Samples: {len(dataset)}")
@@ -205,6 +245,7 @@ def main():
             "device": str(device),
             "model_type": resolved_model_type,
             "img_size": resolved_img_size,
+            "transformer_config": transformer_config if resolved_model_type == "transformer" else None,
             "split": args.split,
             "checkpoint": str(checkpoint_path.resolve()),
             "samples": len(dataset),

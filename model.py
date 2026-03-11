@@ -6,6 +6,14 @@ import torch.nn.functional as F
 
 
 SUPPORTED_MODEL_TYPES = ("cnn", "transformer")
+DEFAULT_TRANSFORMER_CONFIG: Dict[str, Any] = {
+    "patch_size": 4,
+    "embed_dim": 128,
+    "depth": 4,
+    "num_heads": 4,
+    "mlp_ratio": 4.0,
+    "dropout": 0.1,
+}
 
 
 def normalize_model_type(model_type: str) -> str:
@@ -96,7 +104,18 @@ class FlowerNetTransformer(nn.Module):
 
 
 class FlowerNet(nn.Module):
-    def __init__(self, model_type: str = "cnn", num_classes: int = 2, img_size: int = 32):
+    def __init__(
+        self,
+        model_type: str = "cnn",
+        num_classes: int = 2,
+        img_size: int = 32,
+        patch_size: int = int(DEFAULT_TRANSFORMER_CONFIG["patch_size"]),
+        embed_dim: int = int(DEFAULT_TRANSFORMER_CONFIG["embed_dim"]),
+        depth: int = int(DEFAULT_TRANSFORMER_CONFIG["depth"]),
+        num_heads: int = int(DEFAULT_TRANSFORMER_CONFIG["num_heads"]),
+        mlp_ratio: float = float(DEFAULT_TRANSFORMER_CONFIG["mlp_ratio"]),
+        dropout: float = float(DEFAULT_TRANSFORMER_CONFIG["dropout"]),
+    ):
         super().__init__()
         self.model_type = normalize_model_type(model_type)
         self.img_size = img_size
@@ -107,6 +126,12 @@ class FlowerNet(nn.Module):
             self.model = FlowerNetTransformer(
                 img_size=img_size,
                 num_classes=num_classes,
+                patch_size=patch_size,
+                embed_dim=embed_dim,
+                depth=depth,
+                num_heads=num_heads,
+                mlp_ratio=mlp_ratio,
+                dropout=dropout,
             )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -117,6 +142,7 @@ def make_checkpoint_payload(
     model: nn.Module,
     model_type: str,
     img_size: int,
+    transformer_config: Dict[str, Any] | None = None,
     extra: Dict[str, Any] | None = None,
 ) -> Dict[str, Any]:
     payload: Dict[str, Any] = {
@@ -124,6 +150,8 @@ def make_checkpoint_payload(
         "model_type": normalize_model_type(model_type),
         "img_size": int(img_size),
     }
+    if transformer_config:
+        payload["transformer_config"] = dict(transformer_config)
     if extra:
         payload.update(extra)
     return payload
