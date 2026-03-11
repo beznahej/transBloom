@@ -8,7 +8,13 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 
-from model import FlowerNet
+from model import (
+    SUPPORTED_MODEL_TYPES,
+    FlowerNet,
+    load_model_state_compat,
+    normalize_model_type,
+    unpack_checkpoint,
+)
 
 
 def pick_device(requested: str) -> torch.device:
@@ -109,6 +115,8 @@ def main():
     parser.add_argument("--batch-size", type=int, default=64)
     parser.add_argument("--num-workers", type=int, default=0)
     parser.add_argument("--device", choices=["auto", "cpu", "mps", "cuda"], default="auto")
+    parser.add_argument("--model-type", choices=["auto", *SUPPORTED_MODEL_TYPES], default="auto")
+    parser.add_argument("--img-size", type=int, default=None)
     parser.add_argument("--report-json", type=str, default="")
     args = parser.parse_args()
 
@@ -121,9 +129,21 @@ def main():
     if not checkpoint_path.exists():
         raise FileNotFoundError(f"Checkpoint not found: {checkpoint_path}")
 
+    checkpoint_obj = torch.load(checkpoint_path, map_location="cpu")
+    state_dict, checkpoint_meta = unpack_checkpoint(checkpoint_obj)
+    if args.model_type == "auto":
+        resolved_model_type = normalize_model_type(str(checkpoint_meta.get("model_type", "cnn")))
+    else:
+        resolved_model_type = args.model_type
+
+    if args.img_size is not None:
+        resolved_img_size = int(args.img_size)
+    else:
+        resolved_img_size = int(checkpoint_meta.get("img_size", 32))
+
     eval_tfms = transforms.Compose(
         [
-            transforms.Resize((32, 32)),
+            transforms.Resize((resolved_img_size, resolved_img_size)),
             transforms.ToTensor(),
             transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
         ]
@@ -142,9 +162,8 @@ def main():
     )
 
     device = pick_device(args.device)
-    model = FlowerNet().to(device)
-    state_dict = torch.load(checkpoint_path, map_location=device)
-    model.load_state_dict(state_dict)
+    model = FlowerNet(model_type=resolved_model_type, img_size=resolved_img_size).to(device)
+    load_model_state_compat(model, state_dict)
 
     criterion = nn.CrossEntropyLoss()
     loss, acc, confusion = evaluate(
@@ -161,6 +180,8 @@ def main():
     macro_f1 = sum(item["f1"] for item in class_metrics) / len(class_metrics)
 
     print(f"Using device: {device}")
+    print(f"Model type: {resolved_model_type}")
+    print(f"Image size: {resolved_img_size}")
     print(f"Split: {args.split}")
     print(f"Checkpoint: {checkpoint_path.resolve()}")
     print(f"Samples: {len(dataset)}")
@@ -182,6 +203,8 @@ def main():
     if args.report_json:
         report = {
             "device": str(device),
+            "model_type": resolved_model_type,
+            "img_size": resolved_img_size,
             "split": args.split,
             "checkpoint": str(checkpoint_path.resolve()),
             "samples": len(dataset),

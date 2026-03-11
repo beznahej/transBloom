@@ -7,7 +7,7 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 
-from model import FlowerNet
+from model import SUPPORTED_MODEL_TYPES, FlowerNet, make_checkpoint_payload
 
 
 def evaluate(model, dataloader, criterion, device):
@@ -42,6 +42,8 @@ def main():
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--num-workers", type=int, default=2)
     parser.add_argument("--output-dir", type=str, default="checkpoints")
+    parser.add_argument("--img-size", type=int, default=32)
+    parser.add_argument("--model-type", choices=SUPPORTED_MODEL_TYPES, default="cnn")
     args = parser.parse_args()
 
     data_dir = Path(args.data_dir)
@@ -55,10 +57,9 @@ def main():
             "Use ImageFolder layout: data/train/<class_name> and data/val/<class_name>."
         )
 
-    # FlowerNet expects 32x32 RGB inputs because fc1 uses 32*6*6 features.
     train_tfms = transforms.Compose(
         [
-            transforms.Resize((32, 32)),
+            transforms.Resize((args.img_size, args.img_size)),
             transforms.RandomHorizontalFlip(),
             transforms.ToTensor(),
             transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
@@ -66,7 +67,7 @@ def main():
     )
     eval_tfms = transforms.Compose(
         [
-            transforms.Resize((32, 32)),
+            transforms.Resize((args.img_size, args.img_size)),
             transforms.ToTensor(),
             transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
         ]
@@ -102,7 +103,7 @@ def main():
         device = torch.device("mps")
     else:
         device = torch.device("cpu")
-    model = FlowerNet().to(device)
+    model = FlowerNet(model_type=args.model_type, img_size=args.img_size).to(device)
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
 
@@ -114,6 +115,7 @@ def main():
 
     best_val_acc = 0.0
     print(f"Using device: {device}")
+    print(f"Model type: {args.model_type} | img_size={args.img_size}")
     print(f"Train samples: {len(train_ds)} | Val samples: {len(val_ds)}")
     print(f"Classes: {train_ds.classes}")
 
@@ -150,9 +152,29 @@ def main():
 
         if val_acc > best_val_acc:
             best_val_acc = val_acc
-            torch.save(model.state_dict(), output_dir / "best_model.pt")
+            best_payload = make_checkpoint_payload(
+                model=model,
+                model_type=args.model_type,
+                img_size=args.img_size,
+                extra={
+                    "class_to_idx": train_ds.class_to_idx,
+                    "best_val_acc": best_val_acc,
+                    "best_epoch": epoch,
+                },
+            )
+            torch.save(best_payload, output_dir / "best_model.pt")
 
-    torch.save(model.state_dict(), output_dir / "last_model.pt")
+    last_payload = make_checkpoint_payload(
+        model=model,
+        model_type=args.model_type,
+        img_size=args.img_size,
+        extra={
+            "class_to_idx": train_ds.class_to_idx,
+            "best_val_acc": best_val_acc,
+            "epochs": args.epochs,
+        },
+    )
+    torch.save(last_payload, output_dir / "last_model.pt")
     print(f"Best val acc: {best_val_acc:.4f}")
     print(f"Saved checkpoints to: {output_dir.resolve()}")
 
