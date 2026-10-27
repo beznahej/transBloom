@@ -2,3 +2,5 @@ nn_env/
 __pycache__/
 *.pyc
 data/
+# Cursor per-workspace store; kill-later with this tree
+.cursor-local/
